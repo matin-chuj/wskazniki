@@ -48,10 +48,31 @@ plotHigh = plot(emaPlusStd, title="OHLC4 + x·STD", color=color.teal,    linewid
 // Cieniowanie kanału STD
 fill(plotLow, plotHigh, color=color.new(color.gray, 85), title="Kanał STD")
 
-// Pobierz dane z poprzedniego dnia z interwału dziennego
-[prevHigh, prevLow] = request.security(syminfo.tickerid, "D", [high[1], low[1]])
+// --- Pobierz dane z poprzedniego dnia z interwału dziennego ---
+// Używamy gaps=barmerge.gaps_off i lookahead=barmerge.lookahead_on aby uniknąć problemów ze strefami czasowymi
+[dailyHigh, dailyLow] = request.security(syminfo.tickerid, "D", [high, low], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_on)
 
 // Przechowuj maksimum i minimum poprzedniego dnia
-var float yesterdayHigh = na
-var float yesterdayLow  = na
-plot(close)
+var float prevDayHigh = na
+var float prevDayLow = na
+var float currentDayHigh = na
+var float currentDayLow = na
+
+// Sprawdź zmianę dnia używając dayofweek
+isNewDay = ta.change(dayofmonth) != 0
+
+if isNewDay
+    // Przenieś bieżące wartości do poprzednich
+    prevDayHigh := currentDayHigh
+    prevDayLow := currentDayLow
+    // Zainicjuj nowe wartości dla bieżącego dnia
+    currentDayHigh := dailyHigh
+    currentDayLow := dailyLow
+else
+    // Aktualizuj wartości dla bieżącego dnia
+    currentDayHigh := dailyHigh
+    currentDayLow := dailyLow
+
+// Rysuj poziome linie dla maksimum i minimum z poprzedniego dnia
+plot(prevDayHigh, title="Poprzedni dzień - MAX", color=color.new(color.green, 0), linewidth=2, style=plot.style_line)
+plot(prevDayLow, title="Poprzedni dzień - MIN", color=color.new(color.red, 0), linewidth=2, style=plot.style_line)
