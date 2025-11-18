@@ -1,0 +1,151 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © KaskowskiBL & matin-chuj
+
+//@version=6
+indicator("6x EMA + STDV Channel + Rolling VWAP", shorttitle="EMA+STD+VWAP", overlay=true)
+
+// ==================== SEKCJA 1: EMA ====================
+show_ema_section = input.bool(true, title="═══ Pokaż EMA ═══", group="EMA")
+
+length1 = input.int(20,  title="Okres EMA 1", minval=1, group="EMA")
+length2 = input.int(50,  title="Okres EMA 2", minval=1, group="EMA")
+length3 = input.int(100, title="Okres EMA 3", minval=1, group="EMA")
+length4 = input.int(150, title="Okres EMA 4", minval=1, group="EMA")
+length5 = input.int(200, title="Okres EMA 5", minval=1, group="EMA")
+length6 = input.int(300, title="Okres EMA 6", minval=1, group="EMA")
+
+color1 = input.color(color.purple, title="Kolor EMA 1", group="EMA")
+color2 = input.color(color.red,    title="Kolor EMA 2", group="EMA")
+color3 = input.color(color.blue,   title="Kolor EMA 3", group="EMA")
+color4 = input.color(color.green,  title="Kolor EMA 4", group="EMA")
+color5 = input.color(color.yellow, title="Kolor EMA 5", group="EMA")
+color6 = input.color(color.orange, title="Kolor EMA 6", group="EMA")
+
+ema1 = ta.ema(close, length1)
+ema2 = ta.ema(close, length2)
+ema3 = ta.ema(close, length3)
+ema4 = ta.ema(close, length4)
+ema5 = ta.ema(close, length5)
+ema6 = ta.ema(close, length6)
+
+plot(show_ema_section ? ema1 : na, title="EMA 1", color=color1, linewidth=1)
+plot(show_ema_section ? ema2 : na, title="EMA 2", color=color2, linewidth=1)
+plot(show_ema_section ? ema3 : na, title="EMA 3", color=color3, linewidth=1)
+plot(show_ema_section ? ema4 : na, title="EMA 4", color=color4, linewidth=1)
+plot(show_ema_section ? ema5 : na, title="EMA 5", color=color5, linewidth=1)
+plot(show_ema_section ? ema6 : na, title="EMA 6", color=color6, linewidth=1)
+
+// ==================== SEKCJA 2: STDV CHANNEL ====================
+show_stdv_section = input.bool(true, title="═══ Pokaż STDV Channel ═══", group="STDV Channel")
+
+stdPeriod = input.int(200, title="Okres STD", minval=1, group="STDV Channel")
+
+// Kanał 2x STD
+stdMultiplierLow = input.float(2.0, title="Mnożnik STD (dolna) - kanał 2x", step=0.1, group="STDV Channel")
+stdMultiplierHigh = input.float(2.0, title="Mnożnik STD (górna) - kanał 2x", step=0.1, group="STDV Channel")
+stdColorLow = input.color(color.fuchsia, title="Kolor linii dolnej 2x", group="STDV Channel")
+stdColorHigh = input.color(color.teal, title="Kolor linii górnej 2x", group="STDV Channel")
+stdFillColor = input.color(color.new(color.gray, 85), title="Kolor wypełnienia kanału 2x", group="STDV Channel")
+
+// Kanał 3x STD
+show_stdv3x = input.bool(true, title="Pokaż kanał 3x STD", group="STDV Channel")
+stdMultiplierLow3x = input.float(3.0, title="Mnożnik STD (dolna) - kanał 3x", step=0.1, group="STDV Channel")
+stdMultiplierHigh3x = input.float(3.0, title="Mnożnik STD (górna) - kanał 3x", step=0.1, group="STDV Channel")
+stdColorLow3x = input.color(color.new(color.fuchsia, 30), title="Kolor linii dolnej 3x", group="STDV Channel")
+stdColorHigh3x = input.color(color.new(color.teal, 30), title="Kolor linii górnej 3x", group="STDV Channel")
+
+stdBase = ta.stdev(ohlc4, stdPeriod)
+emaBase = ta.ema(close, stdPeriod)
+
+// Kanał 2x STD
+emaPlusStd = emaBase + stdBase * stdMultiplierHigh
+emaMinusStd = emaBase - stdBase * stdMultiplierLow
+
+plotLow = plot(show_stdv_section ? emaMinusStd : na, title="EMA - 2x·STD", color=stdColorLow, linewidth=1)
+plotHigh = plot(show_stdv_section ? emaPlusStd : na, title="EMA + 2x·STD", color=stdColorHigh, linewidth=1)
+fill(plotLow, plotHigh, color=show_stdv_section ? stdFillColor : na, title="Kanał 2x STD")
+
+// Kanał 3x STD (przerywane linie)
+emaPlusStd3x = emaBase + stdBase * stdMultiplierHigh3x
+emaMinusStd3x = emaBase - stdBase * stdMultiplierLow3x
+
+plot(show_stdv_section and show_stdv3x ? emaMinusStd3x : na, title="EMA - 3x·STD", color=stdColorLow3x, linewidth=2, style=plot.style_linebr)
+plot(show_stdv_section and show_stdv3x ? emaPlusStd3x : na, title="EMA + 3x·STD", color=stdColorHigh3x, linewidth=2, style=plot.style_linebr)
+
+// ==================== SEKCJA 3: POPRZEDNI DZIEŃ HIGH/LOW ====================
+show_prevday_section = input.bool(true, title="═══ Pokaż poprzedni dzień HIGH/LOW ═══", group="Poprzedni dzień")
+
+prevDayHighColor = input.color(color.new(color.green, 0), title="Kolor MAX poprzedniego dnia", group="Poprzedni dzień")
+prevDayLowColor = input.color(color.new(color.red, 0), title="Kolor MIN poprzedniego dnia", group="Poprzedni dzień")
+prevDayLineWidth = input.int(2, title="Szerokość linii", minval=1, maxval=6, group="Poprzedni dzień")
+
+dailyHigh = request.security(syminfo.tickerid, "D", high)
+dailyLow = request.security(syminfo.tickerid, "D", low)
+
+var float prevDayHigh = na
+var float prevDayLow = na
+var float currentDayHigh = na
+var float currentDayLow = na
+
+isNewDay = ta.change(dayofmonth) != 0
+
+if isNewDay
+    prevDayHigh := currentDayHigh
+    prevDayLow := currentDayLow
+    currentDayHigh := dailyHigh
+    currentDayLow := dailyLow
+else
+    currentDayHigh := dailyHigh
+    currentDayLow := dailyLow
+
+plot(show_prevday_section ? prevDayHigh : na, title="Poprzedni dzień - MAX", color=prevDayHighColor, linewidth=prevDayLineWidth, style=plot.style_line)
+plot(show_prevday_section ? prevDayLow : na, title="Poprzedni dzień - MIN", color=prevDayLowColor, linewidth=prevDayLineWidth, style=plot.style_line)
+
+// ==================== SEKCJA 4: ROLLING VWAP ====================
+show_vwap_section = input.bool(true, title="═══ Pokaż Rolling VWAP ═══", group="VWAP")
+
+vwap_len = input.int(title="VWAP Period (bars)", defval=257, minval=1, group="VWAP")
+vwap_src = input.source(title="Price source", defval=close, group="VWAP")
+vwap_line_width = input.int(title="Szerokość linii VWAP", defval=2, minval=1, maxval=6, group="VWAP")
+vwap_col_above = input.color(title="Kolor gdy cena >= VWAP", defval=color.new(color.green, 0), group="VWAP")
+vwap_col_below = input.color(title="Kolor gdy cena < VWAP", defval=color.new(color.red, 0), group="VWAP")
+vwap_smoothing_type = input.string(title="Wygładzanie linii", defval="None", options=["None", "SMA", "EMA"], group="VWAP")
+vwap_smoothing_len = input.int(title="Długość wygładzania (jeśli SMA/EMA)", defval=9, minval=1, group="VWAP")
+vwap_show_label = input.bool(true, title="Pokaż etykietę z wartością VWAP", group="VWAP")
+vwap_label_position = input.string(title="Pozycja etykiety", defval="right", options=["left", "right"], group="VWAP")
+vwap_use_fallback = input.bool(false, title="Fallback do SMA gdy brak wolumenu", group="VWAP")
+
+// Obliczenia VWAP
+vwap_num = math.sum(vwap_src * volume, vwap_len)
+vwap_den = math.sum(volume, vwap_len)
+vwap_raw = (vwap_den == 0) ? na : vwap_num / vwap_den
+vwap_with_fallback = na(vwap_raw) ? (vwap_use_fallback ? ta.sma(vwap_src, vwap_len) : na) : vwap_raw
+
+vwap_plot = vwap_with_fallback
+if vwap_smoothing_type == "SMA"
+    vwap_plot := ta.sma(vwap_with_fallback, vwap_smoothing_len)
+else
+    if vwap_smoothing_type == "EMA"
+        vwap_plot := ta.ema(vwap_with_fallback, vwap_smoothing_len)
+
+vwap_color = na(vwap_plot) ? color.gray : (close >= vwap_plot ? vwap_col_above : vwap_col_below)
+
+plot(show_vwap_section ? vwap_plot : na, title="VWAP (rolling)", color=vwap_color, linewidth=vwap_line_width, style=plot.style_line)
+
+// Etykieta VWAP
+var label vwapLabel = na
+if show_vwap_section and vwap_show_label and barstate.islast
+    if not na(vwapLabel)
+        label.delete(vwapLabel)
+    if not na(vwap_plot)
+        pct = 100 * (close - vwap_plot) / vwap_plot
+        txt = "VWAP(" + str.tostring(vwap_len) + "): " + str.tostring(vwap_plot, format.mintick) + "\nΔ: " + str.tostring(pct, format.percent)
+        offset = math.max(1, int(vwap_len / 10))
+        x_pos = vwap_label_position == "right" ? bar_index : bar_index - offset
+        vwapLabel := label.new(x_pos, vwap_plot, text=txt, xloc=xloc.bar_index, yloc=yloc.price,
+                               style=label.style_label_left, color=color.new(vwap_color, 0),
+                               textcolor=color.white, size=size.small)
+
+// Informacja o braku wolumenu
+noVol = vwap_den == 0
+plotshape(series=(show_vwap_section and noVol), title="No volume data", location=location.top, style=shape.labelup, text="No vol", textcolor=color.orange, size=size.tiny, color=color.new(color.orange, 90))
