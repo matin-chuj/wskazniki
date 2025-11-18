@@ -1,0 +1,57 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © KaskowskiBL
+
+//@version=6
+indicator("6x EMA close + STDV Channel TEST", overlay=true)
+
+// --- Parametry EMA ---
+length1 = input.int(20,  title="Okres EMA 1", minval=1)
+length2 = input.int(50,  title="Okres EMA 2", minval=1)
+length3 = input.int(100, title="Okres EMA 3", minval=1)
+length4 = input.int(150, title="Okres EMA 4", minval=1)
+length5 = input.int(200, title="Okres EMA 5", minval=1)
+length6 = input.int(300, title="Okres EMA 6", minval=1)
+
+// --- Obliczanie EMA z ceny Close ---
+ema1 = ta.ema(close, length1)
+ema2 = ta.ema(close, length2)
+ema3 = ta.ema(close, length3)
+ema4 = ta.ema(close, length4)
+ema5 = ta.ema(close, length5)
+ema6 = ta.ema(close, length6)
+
+// --- Rysowanie EMA ---
+plot(ema1, title="EMA 1", color=color.purple, linewidth=1)
+plot(ema2, title="EMA 2", color=color.red,    linewidth=1)
+plot(ema3, title="EMA 3", color=color.blue,   linewidth=1)
+plot(ema4, title="EMA 4", color=color.green,  linewidth=1)
+plot(ema5, title="EMA 5", color=color.yellow, linewidth=1)
+plot(ema6, title="EMA 6", color=color.orange, linewidth=1)
+
+// --- Parametry odchylenia standardowego ---
+stdPeriod       = input.int(200,   title="Okres STD", minval=1)
+stdMultiplierLow  = input.float(2.0, title="Mnożnik STD (dolna)", step=0.1)
+stdMultiplierHigh = input.float(2.0, title="Mnożnik STD (górna)", step=0.1)
+
+
+// Obliczanie odchylenia standardowego
+stdBase = ta.stdev(ohlc4, stdPeriod)
+
+// Linie przesunięte względem OHLC/4
+emaPlusStd   = ta.ema(close, stdPeriod) + stdBase * stdMultiplierLow
+emaMinusStd = ta.ema(close, stdPeriod) - stdBase * stdMultiplierHigh
+
+// Rysowanie linii STD
+plotLow  = plot(emaMinusStd,   title="OHLC4 - x·STD", color=color.fuchsia, linewidth=1)
+plotHigh = plot(emaPlusStd, title="OHLC4 + x·STD", color=color.teal,    linewidth=1)
+
+// Cieniowanie kanału STD
+fill(plotLow, plotHigh, color=color.new(color.gray, 85), title="Kanał STD")
+
+// Pobierz dane z poprzedniego dnia z interwału dziennego
+[prevHigh, prevLow] = request.security(syminfo.tickerid, "D", [high[1], low[1]])
+
+// Przechowuj maksimum i minimum poprzedniego dnia
+var float yesterdayHigh = na
+var float yesterdayLow  = na
+plot(close)
