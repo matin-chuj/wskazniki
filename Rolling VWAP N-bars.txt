@@ -1,0 +1,69 @@
+//@version=6
+indicator("Rolling VWAP — N bars (fixed sum)", shorttitle="VWAP N bars", overlay=true, scale=scale.right)
+
+// === Ustawienia użytkownika ===
+len = input.int(title="VWAP Period (bars)", defval=257, minval=1)
+src = input.source(title="Price source", defval=close)
+show_vwap = input.bool(true, title="Show VWAP line")
+line_width = input.int(title="Line width", defval=2, minval=1, maxval=6)
+col_above = input.color(title="Color when price >= VWAP", defval=color.new(color.green, 0))
+col_below = input.color(title="Color when price < VWAP", defval=color.new(color.red, 0))
+smoothing_type = input.string(title="Line smoothing", defval="None", options=["None", "SMA", "EMA"])
+smoothing_len = input.int(title="Smoothing length (if SMA/EMA)", defval=9, minval=1)
+show_label = input.bool(true, title="Show current VWAP label")
+label_position = input.string(title="Label position", defval="right", options=["left", "right"])
+enable_alerts = input.bool(false, title="Enable cross alerts")
+use_fallback_when_no_vol = input.bool(false, title="Fallback to SMA(src,len) when volume sum = 0")
+
+// === Obliczenia VWAP (rolling) ===
+// Używamy wbudowanej funkcji sum(...) (nie ta.sum)
+num = math.sum(src * volume, len)   // linia 22 w wcześniejszych wersjach — teraz poprawione
+den = math.sum(volume, len)
+
+// Alternatywny sposób (jeśli Twoja wersja TradingView nie ma sum()):
+// cum_num = ta.cum(src * volume)
+// cum_den = ta.cum(volume)
+// num = cum_num - nz(cum_num[len], 0)
+// den = cum_den - nz(cum_den[len], 0)
+
+// VWAP: jeśli den == 0 -> na()
+vwap_raw = (den == 0) ? na : num / den
+
+// fallback: jeśli brak wolumenu i użytkownik włączył fallback -> SMA(src,len)
+vwap_with_fallback = na(vwap_raw) ? (use_fallback_when_no_vol ? ta.sma(src, len) : na) : vwap_raw
+
+// opcjonalne wygładzanie linii (tylko wizualne)
+vwap_plot = vwap_with_fallback
+if smoothing_type == "SMA"
+    vwap_plot := ta.sma(vwap_with_fallback, smoothing_len)
+else
+    if smoothing_type == "EMA"
+        vwap_plot := ta.ema(vwap_with_fallback, smoothing_len)
+
+// kolor w zależności od relacji ceny do VWAP
+vwap_color = na(vwap_plot) ? color.gray : (close >= vwap_plot ? col_above : col_below)
+
+// === Rysowanie ===
+// plot() musi być w global scope — nie wewnątrz if. Użyjemy warunku show_vwap ? vwap_plot : na
+plot(show_vwap ? vwap_plot : na, title="VWAP (rolling)", color=vwap_color, linewidth=line_width, style=plot.style_line)
+
+
+// Etykieta na ostatniej świecy z wartością i % różnicą
+var label vwapLabel = na
+if show_label and barstate.islast
+    if not na(vwapLabel)
+        label.delete(vwapLabel)
+    if not na(vwap_plot)
+        pct = 100 * (close - vwap_plot) / vwap_plot
+        txt = "VWAP(" + str.tostring(len) + "): " + str.tostring(vwap_plot, format.mintick) + "\nΔ: " + str.tostring(pct, format.percent)
+        offset = math.max(1, int(len / 10))
+        x_pos = label_position == "right" ? bar_index : bar_index - offset
+        vwapLabel := label.new(x_pos, vwap_plot, text=txt, xloc=xloc.bar_index, yloc=yloc.price,
+                               style=label.style_label_left, color=color.new(vwap_color, 0),
+                               textcolor=color.white, size=size.small)
+
+
+
+// Informacja diagnostyczna: gdy suma wolumenu = 0 (brak danych)
+noVol = den == 0
+plotshape(series=noVol, title="No volume data", location=location.top, style=shape.labelup, text="No vol", textcolor=color.orange, size=size.tiny, color=color.new(color.orange, 90))
